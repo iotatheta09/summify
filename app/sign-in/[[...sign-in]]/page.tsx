@@ -1,5 +1,5 @@
 import { SignIn } from '@clerk/nextjs'
-import { Section } from 'lucide-react'
+
 import BgGradient from '@/components/common/bg-gradient'
 export default function Page() {
   return (
