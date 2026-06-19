@@ -3,9 +3,12 @@ import { useRef, useState } from "react";
 import { useUploadThing } from "@/utils/uploadthing";
 import {useToast} from '@/hooks/use-toast';
 
-import { generatePdfSummary } from "@/actions/upload-actions";
+import { generatePdfSummary, storePdfSummaryAction } from "@/actions/upload-actions";
 import UploadFormInput from "./upload-form-input"
 import { z} from "zod";
+import { redirect } from "next/dist/server/api-utils";
+import { useRouter } from "next/navigation";
+//import { useRouter } from "next/router";
 const Schema = z.object({
  file: z
  .instanceof(File,{message: 'Invalid file'})
@@ -24,6 +27,7 @@ export default function UploadForm(){
   const {toast} =useToast();
   const formRef =useRef<HTMLFormElement>(null);
   const [isLoading,setIsLoading]=useState(false);
+  const router=useRouter();
 
 
     
@@ -95,14 +99,32 @@ export default function UploadForm(){
         console.log({result});
          const {data = null, message= null }  = result || {};
          if(data){
+          let storeResult:any;
           toast({
             title:'📄 Saving PDF...',
             description:'Hang tight! We are saving your summary! ✨',
 
           });
-          formRef.current?.reset();
+         
           if(data.summary){
            // save the summary to the database
+
+
+              storeResult= await storePdfSummaryAction({
+                summary:data.summary,
+                fileUrl:resp[0].serverData.file.url,
+                title:data.title,
+                fileName:file.name,
+               })
+               toast({
+                title:'✨ Summary Generated!',
+                description:'Your PDF has been successfully summarized and  saved! ✨',
+               })
+                formRef.current?.reset();
+                //redirect to the [id] summary page
+                router.push(`/summaries/${storeResult.data.id}`)
+
+
           }
 
          }
@@ -112,6 +134,8 @@ export default function UploadForm(){
           console.error('Error occurred',error);
            formRef.current?.reset();
           
+        }finally{
+          setIsLoading(false);
         }
 
 
