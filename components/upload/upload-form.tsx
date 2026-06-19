@@ -1,9 +1,11 @@
 'use client';
+import { useRef, useState } from "react";
 import { useUploadThing } from "@/utils/uploadthing";
+import {useToast} from '@/hooks/use-toast';
 
 import { generatePdfSummary } from "@/actions/upload-actions";
 import UploadFormInput from "./upload-form-input"
-import * as z from "zod";
+import { z} from "zod";
 const Schema = z.object({
  file: z
  .instanceof(File,{message: 'Invalid file'})
@@ -20,6 +22,9 @@ const Schema = z.object({
 
 export default function UploadForm(){
   const {toast} =useToast();
+  const formRef =useRef<HTMLFormElement>(null);
+  const [isLoading,setIsLoading]=useState(false);
+
 
     
   const { startUpload, routeConfig } = useUploadThing("pdfUploader", {
@@ -43,6 +48,11 @@ export default function UploadForm(){
     const handleSubmit=async(e:React.FormEvent<HTMLFormElement>)=>{
         e.preventDefault();
         //console.log('submitted');
+
+        try {
+
+          setIsLoading(true);
+
         const formData=new FormData(e.currentTarget);
         const file=formData.get('file')as File;
 
@@ -55,8 +65,13 @@ export default function UploadForm(){
               variant:'destructive',
               description: validatedFields.error.flatten().fieldErrors.file?.[0] ?? 'Invalid file'
             })
+            setIsLoading(false);
             return;
         }
+        toast({
+          title:'📄 Uploading PDF...',
+          description:'We are uploading your PDF! ✨',
+        })
         
         //schema with zod
         //upload the file to uploadthing
@@ -67,15 +82,46 @@ export default function UploadForm(){
             description:'please use a different file',
             variant:'destructive',
           })
+          setIsLoading(false);
           return;
         }
         toast({
-          title:'📄 Uploading PDF',
-          description:'We are uploading your PDF!'
+          title:'📄 Processing PDF',
+          description:'Hang tight! Our AI is reading through your document! ✨',
         })
 
         //parse the pdf using langchain
-        const summary=await generatePdfSummary(resp);
+        const result=await generatePdfSummary(resp);
+        console.log({result});
+         const {data = null, message= null }  = result || {};
+         if(data){
+          toast({
+            title:'📄 Saving PDF...',
+            description:'Hang tight! We are saving your summary! ✨',
+
+          });
+          formRef.current?.reset();
+          if(data.summary){
+           // save the summary to the database
+          }
+
+         }
+          
+        } catch (error) {
+          setIsLoading(false);
+          console.error('Error occurred',error);
+           formRef.current?.reset();
+          
+        }
+
+
+
+
+
+
+
+        
+
         //summarize the pdf using AI
         //save the summary to the database
         //redirect to the [id] summary page
@@ -83,7 +129,10 @@ export default function UploadForm(){
     };
     return (
         <div className="flex flex-xol gap-8 w-full max-w-2xl mx-auto">
-            <UploadFormInput onSubmit={handleSubmit}/>
+            <UploadFormInput 
+            isLoading={isLoading}
+            
+            ref={formRef} onSubmit={handleSubmit}/>
         </div>
 
     );
